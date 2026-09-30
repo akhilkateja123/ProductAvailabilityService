@@ -155,6 +155,13 @@ Notes:
 - `--min-instances 1 --max-instances 1` pins this to a single instance for the demo (see the presentation for why, and how the production target scales this out with a shared cache).
 - CORS is enabled on `/availability/**` (see `WebConfig`) so the endpoint can be called directly from a browser-based demo page, not just curl/Postman.
 - On a fresh GCP project, the default Compute Engine service account may need `roles/storage.objectViewer` and `roles/artifactregistry.writer` granted before the first deploy succeeds (Cloud Build uses this account to read the uploaded source and push the built image).
+- `server.forward-headers-strategy: framework` (see `application.yml`) is required behind Cloud Run's TLS-terminating proxy — without it, springdoc generates `http://` server URLs even though the service is only reachable over `https://`, which breaks Swagger UI's "Try it out" with a mixed-content error in the browser.
+
+### Redeploying after a code change
+
+**Manual:** re-run the same `gcloud run deploy` command above from the project root. Cloud Build rebuilds the image from the current source and Cloud Run rolls out a new revision, shifting 100% of traffic to it; the previous revision stays available for rollback (`gcloud run services update-traffic`) but serves no traffic.
+
+**Automatic (GitHub → Cloud Run):** this repo is connected to Cloud Run via a Cloud Build trigger — every push to `main` automatically rebuilds the Dockerfile and deploys a new revision of `product-availability-service` in `us-west1`, with no manual step. Set up once via Cloud Run's console → **Continuously deploy new revisions** → GitHub → authorize the Google Cloud Build GitHub App → select this repo; that flow creates the trigger directly (no separate `cloudbuild.yaml` needed, since it builds from the Dockerfile inline). Build progress and history: `https://console.cloud.google.com/cloud-build/builds`.
 
 ## Bonus items included
 
