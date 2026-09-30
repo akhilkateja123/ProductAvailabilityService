@@ -23,5 +23,3 @@ logging:
   level:
     root: INFO
     com.aritzia.availability: INFO
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"

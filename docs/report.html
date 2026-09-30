@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Product Availability Service</title>
+<style>
+/* Layout: single scrollable report — sticky TOC sidebar on desktop, collapsing to a top bar on narrow screens */
+:root {
+  --bg: #0B0E14;
+  --bg-raised: #11151D;
+  --bg-card: #161B26;
+  --border: #232A38;
+  --border-strong: #2E3849;
+  --text: #E9ECF2;
+  --text-dim: #9AA4B8;
+  --text-faint: #5B6478;
+  --accent: #6F97FF;
+  --accent-dim: #2A3A66;
+  --green: #4ADE9A;
+  --green-bg: #0F2A1F;
+  --amber: #F5A94E;
+  --amber-bg: #2B2110;
+  --red: #FF6B65;
+  --red-bg: #2B1414;
+  --font-head: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", Consolas, "Courier New", monospace;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --bg: #F7F8FA;
+  --bg-raised: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --border: #E1E4EA;
+  --border-strong: #C9CEDA;
+  --text: #171A21;
+  --text-dim: #565F73;
+  --text-faint: #8A93A6;
+  --accent: #2D5BFF;
+  --accent-dim: #E3EAFF;
+  --green: #0F9D63;
+  --green-bg: #E6F7EE;
+  --amber: #C2740B;
+  --amber-bg: #FDF1DF;
+  --red: #D13B34;
+  --red-bg: #FBEAE9;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  margin: 0;
+  overflow-x: hidden;
+}
+.page {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 0;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+@media (max-width: 880px) {
+  .page { grid-template-columns: 1fr; }
+}
+
+/* TOC */
+.toc {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  align-self: start;
+  height: 100dvh;
+  overflow-y: auto;
+  padding: 28px 16px 28px 20px;
+  border-right: 0.5px solid var(--border);
+}
+@media (max-width: 880px) {
+  .toc {
+    position: sticky; height: auto; max-height: none;
+    border-right: none; border-bottom: 0.5px solid var(--border);
+    padding: 14px 20px;
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(8px);
+    z-index: 10;
+  }
+  .toc-list { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+  .toc-list li { flex-shrink: 0; }
+  .toc-group-label { display: none; }
+  .toc-brand { display: none; }
+}
+.toc-brand {
+  font-family: var(--font-head); font-style: italic; font-size: 14px;
+  color: var(--text-dim); margin: 0 0 20px;
+}
+.toc-list { list-style: none; margin: 0; padding: 0; }
+.toc-group-label {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-faint); margin: 18px 0 6px; padding-left: 10px;
+}
+.toc-group-label:first-child { margin-top: 0; }
+.toc-list a {
+  display: block; font-size: 12.5px; color: var(--text-dim); text-decoration: none;
+  padding: 5px 10px; border-radius: 6px; border-left: 2px solid transparent;
+  white-space: nowrap;
+}
+.toc-list a:hover { color: var(--text); background: var(--bg-card); }
+@media (min-width: 881px) {
+  .toc-list a.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-dim); }
+}
+
+.content { min-width: 0; padding: 0 28px 100px; }
+.hero {
+  padding: 56px 0 40px;
+  border-bottom: 0.5px solid var(--border);
+  margin-bottom: 40px;
+}
+.eyebrow {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.08em;
+  color: var(--accent); text-transform: uppercase; margin: 0 0 10px;
+}
+h1.doc-title {
+  font-family: var(--font-head); font-size: clamp(32px, 5vw, 48px); font-weight: 600;
+  margin: 0 0 16px; text-wrap: balance; color: var(--text);
+}
+.doc-sub { font-size: 18px; line-height: 1.6; color: var(--text-dim); max-width: 62ch; margin: 0; }
+
+.chapter { padding: 36px 0; border-bottom: 0.5px solid var(--border); scroll-margin-top: 20px; }
+.chapter:last-child { border-bottom: none; }
+.chapter-kicker {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--accent); margin: 0 0 8px;
+}
+h2.chapter-title {
+  font-family: var(--font-head); font-size: clamp(24px, 3vw, 32px); font-weight: 600;
+  margin: 0 0 16px; text-wrap: balance; color: var(--text);
+}
+h3.sub-title {
+  font-family: var(--font-head); font-size: 20px; font-weight: 600;
+  margin: 32px 0 14px; color: var(--text);
+}
+.lede { font-size: 16px; line-height: 1.65; color: var(--text-dim); max-width: 68ch; margin: 0 0 24px; }
+
+.card {
+  background: var(--bg-card); border: 0.5px solid var(--border); border-radius: 12px; padding: 20px 24px;
+}
+.grid { display: grid; gap: 16px; margin-bottom: 20px; }
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 720px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+.card h4 { font-size: 15px; font-weight: 600; margin: 0 0 8px; color: var(--text); }
+.card p, .card li { font-size: 13.5px; color: var(--text-dim); line-height: 1.55; }
+.card ul { margin: 0; padding-left: 18px; }
+.card li { margin-bottom: 6px; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 6px;
+}
+.badge.ok { background: var(--green-bg); color: var(--green); }
+.badge.warn { background: var(--amber-bg); color: var(--amber); }
+.badge.err { background: var(--red-bg); color: var(--red); }
+
+code.inline {
+  font-family: var(--font-mono); font-size: 0.9em;
+  background: var(--bg-raised); border: 0.5px solid var(--border-strong);
+  border-radius: 4px; padding: 1px 6px; color: var(--accent);
+}
+.codebox {
+  background: #0d1117; border: 0.5px solid var(--border-strong); border-radius: 10px;
+  padding: 14px 16px; font-family: var(--font-mono); font-size: 12.5px; color: #c9d6f0;
+  overflow-x: auto; white-space: pre; margin-bottom: 12px;
+}
+:root[data-theme="light"] .codebox { background: #11151d; color: #d7e2ff; }
+
+table.reftable { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.reftable th {
+  text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-faint); font-weight: 600; padding: 6px 10px; border-bottom: 0.5px solid var(--border-strong);
+}
+table.reftable td { padding: 7px 10px; border-bottom: 0.5px solid var(--border); vertical-align: top; }
+table.reftable td.mono { font-family: var(--font-mono); font-size: 11.5px; }
+table.reftable tr:nth-child(even) { background: color-mix(in srgb, var(--bg-raised) 60%, transparent); }
+.table-wrap { overflow-x: auto; }
+
+.diagram-frame {
+  background: #ffffff; border-radius: 10px; border: 0.5px solid var(--border-strong);
+  padding: 8px; overflow-x: auto; margin-bottom: 16px;
+}
+.diagram-frame svg { display: block; width: 100%; height: auto; min-width: 560px; }
+
+.iframe-frame {
+  border-radius: 10px; border: 0.5px solid var(--border-strong);
+  overflow: hidden; height: 640px;
+}
+.iframe-frame iframe { width: 100%; height: 100%; border: none; display: block; }
+
+.timeline-lane { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.timeline-lane .lane-label { width: 90px; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.timeline-step {
+  flex: 1; background: var(--accent-dim); border: 0.5px solid var(--border-strong);
+  border-radius: 6px; padding: 8px 6px; text-align: center; font-size: 11px; color: var(--text);
+}
+.timeline-step.conflict { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+
+.kicker-list { list-style: none; padding: 0; margin: 0 0 20px; display: flex; flex-direction: column; gap: 14px; }
+.kicker-list li { display: flex; gap: 12px; align-items: flex-start; font-size: 15px; color: var(--text); }
+.kicker-list .dot { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); margin-top: 7px; flex-shrink: 0; }
+
+.callout {
+  background: var(--amber-bg); border: 0.5px solid var(--amber); border-radius: 10px;
+  padding: 16px 20px; font-size: 14px; color: var(--text); margin-bottom: 20px;
+}
+.callout strong { color: var(--amber); }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+</style>
+</head>
+<body>
+
+<h2 class="sr-only">A report on the Product Availability microservice built for Aritzia's backend case assessment: problem, architecture, quality, path to production, and a deep-dive appendix.</h2>
+
+<div class="page">
+  <nav class="toc">
+    <p class="toc-brand">Product Availability Service</p>
+    <ul class="toc-list" id="toc-list">
+      <li class="toc-group-label">Problem</li>
+      <li><a href="#the-ask">The ask</a></li>
+      <li><a href="#sku-model">What is a productId</a></li>
+      <li><a href="#validation">Validation rules</a></li>
+      <li class="toc-group-label">Architecture</li>
+      <li><a href="#demo-architecture">Demo architecture</a></li>
+      <li><a href="#layered-design">Layered design</a></li>
+      <li><a href="#scalability">Scalability</a></li>
+      <li class="toc-group-label">Live demo</li>
+      <li><a href="#live-demo">Live demo</a></li>
+      <li class="toc-group-label">Quality</li>
+      <li><a href="#tests">Tests & error handling</a></li>
+      <li><a href="#ops">Logging, caching, docs</a></li>
+      <li><a href="#cors">CORS</a></li>
+      <li class="toc-group-label">Path to production</li>
+      <li><a href="#prod-architecture">Production architecture</a></li>
+      <li><a href="#one-instance">Why one instance isn't enough</a></li>
+      <li class="toc-group-label">Wrap-up</li>
+      <li><a href="#next">What I'd do next</a></li>
+      <li class="toc-group-label">Appendix</li>
+      <li><a href="#appendix-alternatives">Alternatives considered</a></li>
+      <li><a href="#appendix-race">Race conditions</a></li>
+      <li><a href="#appendix-region">Multi-region</a></li>
+    </ul>
+  </nav>
+
+  <main class="content">
+    <div class="hero">
+      <p class="eyebrow">Aritzia — (Senior) Developer, Backend case assessment</p>
+      <h1 class="doc-title">Product Availability Service</h1>
+      <p class="doc-sub">A backend microservice case study — architecture, implementation, and the path to production.</p>
+    </div>
+
+    <section class="chapter" id="the-ask">
+      <p class="chapter-kicker">01 — Problem</p>
+      <h2 class="chapter-title">The ask</h2>
+      <p class="lede">Build a lightweight Product Availability microservice: one REST endpoint that returns real-time stock status for a product SKU, for internal consumers like checkout and storefront.</p>
+      <div class="grid grid-3">
+        <div class="card">
+          <h4>Contract</h4>
+          <ul>
+            <li><code class="inline">GET /availability/{productId}</code></li>
+            <li>JSON response</li>
+            <li>200 / 400 / 404 / 500</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Business rule</h4>
+          <ul>
+            <li>inStock = true when quantity &gt; 0</li>
+            <li>inStock = false when quantity = 0</li>
+            <li>Missing product → 404</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Stack</h4>
+          <ul>
+            <li>Java 21 + Spring Boot 3</li>
+            <li>Maven</li>
+            <li>In-memory data (10 SKUs)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="sku-model">
+      <p class="chapter-kicker">01 — Problem</p>
+      <h2 class="chapter-title">First question: what is a "productId"?</h2>
+      <p class="lede">Aritzia's storefront runs on Salesforce B2C Commerce (confirmed by the case study, and by the PWA Kit bundle paths visible on aritzia.com). SFCC uses a master/variant product model.</p>
+      <div class="card" style="margin-bottom: 20px;">
+        <div style="display:flex; align-items:center; gap: 10px; flex-wrap: wrap;">
+          <div style="background: var(--accent); color: #fff; border-radius: 8px; padding: 14px 18px; font-size: 13px; font-weight: 600; text-align:center; flex-shrink:0;">Master product<br><span style="font-weight:400; opacity:0.85;">(the style)</span></div>
+          <span style="color: var(--text-faint);">→</span>
+          <div style="background: var(--accent-dim); color: var(--accent); border-radius: 8px; padding: 12px 16px; font-size: 12.5px; font-weight: 600;">Black / S</div>
+          <div style="background: var(--accent-dim); color: var(--accent); border-radius: 8px; padding: 12px 16px; font-size: 12.5px; font-weight: 600;">Black / M</div>
+          <div style="background: var(--accent-dim); color: var(--accent); border-radius: 8px; padding: 12px 16px; font-size: 12.5px; font-weight: 600;">Cream / S</div>
+          <div style="background: var(--accent-dim); color: var(--accent); border-radius: 8px; padding: 12px 16px; font-size: 12.5px; font-weight: 600;">Cream / M</div>
+        </div>
+        <p style="font-size:12px; color:var(--text-faint); font-style:italic; margin: 12px 0 0;">Each variant is its own SKU — its own inventory record, own availability.</p>
+      </div>
+      <div class="callout">
+        <strong>Answering the actual question:</strong> colors are not the same SKU, and sizes are not the same SKU — every color × size combination is its own variant SKU with its own quantity. The master style only carries shared content (title, images, price). So <strong>productId in this exercise = a variant-level SKU</strong>, matching SFCC's own model — not the style ID shown in a PDP URL.
+      </div>
+    </section>
+
+    <section class="chapter" id="validation">
+      <p class="chapter-kicker">01 — Problem</p>
+      <h2 class="chapter-title">Validation: drawing the 400 / 404 line</h2>
+      <p class="lede">productId is rejected with 400 unless, after trimming, it matches <code class="inline">^[0-9]{1,20}$</code></p>
+      <div class="card table-wrap" style="padding: 0; overflow: hidden;">
+        <table class="reftable">
+          <tr><th style="padding-left:20px;">Input</th><th>Outcome</th><th style="padding-right:20px;">Why</th></tr>
+          <tr><td class="mono" style="padding-left:20px;">null / ""</td><td><span class="badge err">400</span></td><td style="padding-right:20px;">No input to parse</td></tr>
+          <tr><td class="mono" style="padding-left:20px;">"00042" (leading zeros)</td><td><span class="badge ok">200/404</span></td><td style="padding-right:20px;">String match, never coerced to int — SKU is an identifier, not a number</td></tr>
+          <tr><td class="mono" style="padding-left:20px;">"123 456" (internal space)</td><td><span class="badge err">400</span></td><td style="padding-right:20px;">Whole trimmed string must match the pattern</td></tr>
+          <tr><td class="mono" style="padding-left:20px;">"  12345  " (surrounding space)</td><td><span class="badge ok">trimmed → valid</span></td><td style="padding-right:20px;">Trim happens before the regex check</td></tr>
+          <tr><td class="mono" style="padding-left:20px;">21+ digit numeric string</td><td><span class="badge err">400</span></td><td style="padding-right:20px;">Max-length bound — defends against unbounded input</td></tr>
+          <tr><td class="mono" style="padding-left:20px;">well-formed, no such SKU</td><td><span class="badge warn">404</span></td><td style="padding-right:20px;">Never 500 — reserved for real data-source failures</td></tr>
+          <tr><td class="mono" style="padding-left:20px;">GET /availability/ (no ID)</td><td><span class="badge err">400</span></td><td style="padding-right:20px;">Spring sees no matching route; mapped to the same 400 as an empty ID</td></tr>
+          <tr><td class="mono" style="padding-left:20px;">GET /foo, /availability/1/2</td><td><span class="badge warn">404</span></td><td style="padding-right:20px;">Genuinely unknown route — "No route for …", not a misleading 400</td></tr>
+          <tr><td class="mono" style="padding-left:20px;">POST /availability/10001</td><td><span class="badge warn">405</span></td><td style="padding-right:20px;">Framework errors keep their real status and an <code class="inline">Allow: GET</code> header, instead of being masked as 500</td></tr>
+          <tr><td class="mono" style="padding-left:20px;">negative quantity in the data</td><td><span class="badge err">500</span></td><td style="padding-right:20px;">Spec gap: treated as corrupt data and rejected, never served as <code class="inline">availableQuantity: -3</code></td></tr>
+        </table>
+      </div>
+      <p style="font-size: 12.5px; color: var(--text-faint); margin-top: 12px;">Any caller input echoed into an error or log line is capped at 50 characters with control characters replaced, so oversized input can't bloat logs and embedded newlines can't forge log entries.</p>
+    </section>
+
+    <section class="chapter" id="demo-architecture">
+      <p class="chapter-kicker">02 — Architecture</p>
+      <h2 class="chapter-title">Demo architecture: Cloud Run, single instance</h2>
+      <p class="lede">What's actually deployed and running for this presentation.</p>
+      <div class="diagram-frame">
+<svg viewBox="0 0 1280 620" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <defs>
+    <marker id="arrowDemo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5F6368"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1280" height="620" fill="#FFFFFF"/>
+
+  <text x="640" y="34" text-anchor="middle" font-size="22" font-weight="bold" fill="#202124">Demo architecture (Cloud Run, single instance)</text>
+
+  <rect x="40" y="56" width="1200" height="524" rx="24" fill="#FAFAFA" stroke="#DADCE0" stroke-width="2"/>
+  <text x="62" y="82" font-size="13" font-weight="bold" fill="#5F6368">GCP Project</text>
+
+  <rect x="72" y="270" width="150" height="90" rx="8" fill="#F5F5F5" stroke="#757575" stroke-width="1.5"/>
+  <text x="147" y="302" text-anchor="middle" font-size="15" font-weight="bold" fill="#202124">Client</text>
+  <text x="147" y="320" text-anchor="middle" font-size="12" fill="#555555">Internal service</text>
+  <text x="147" y="335" text-anchor="middle" font-size="12" fill="#555555">caller (checkout /</text>
+  <text x="147" y="350" text-anchor="middle" font-size="12" fill="#555555">storefront)</text>
+
+  <rect x="278" y="280" width="170" height="70" rx="8" fill="#E8F0FE" stroke="#1A73E8" stroke-width="1.5"/>
+  <text x="363" y="308" text-anchor="middle" font-size="15" font-weight="bold" fill="#202124">Cloud Armor</text>
+  <text x="363" y="326" text-anchor="middle" font-size="12" fill="#555555">WAF + edge network</text>
+  <text x="363" y="340" text-anchor="middle" font-size="12" fill="#555555">security</text>
+
+  <rect x="504" y="100" width="660" height="410" rx="20" fill="#E1F5FE" stroke="#4285F4" stroke-width="2"/>
+  <text x="524" y="126" font-size="14" font-weight="bold" fill="#1A73E8">Cloud Run</text>
+
+  <rect x="528" y="140" width="612" height="358" rx="8" fill="#FFFFFF" stroke="#4285F4" stroke-width="1.5"/>
+  <text x="834" y="164" text-anchor="middle" font-size="15" font-weight="bold" fill="#202124">Product Availability Service (Java)</text>
+  <text x="834" y="182" text-anchor="middle" font-size="12" fill="#555555">min=1, max=1 instance</text>
+
+  <rect x="558" y="198" width="200" height="56" rx="8" fill="#E8F0FE" stroke="#1A73E8" stroke-width="1.5"/>
+  <text x="658" y="221" text-anchor="middle" font-size="14" font-weight="bold" fill="#202124">Rate limiter</text>
+  <text x="658" y="238" text-anchor="middle" font-size="11" fill="#555555">token bucket per IP</text>
+
+  <rect x="558" y="276" width="200" height="56" rx="8" fill="#E8F0FE" stroke="#1A73E8" stroke-width="1.5"/>
+  <text x="658" y="299" text-anchor="middle" font-size="14" font-weight="bold" fill="#202124">Controller</text>
+  <text x="658" y="316" text-anchor="middle" font-size="11" fill="#555555">input validation</text>
+
+  <rect x="558" y="354" width="200" height="56" rx="8" fill="#E8F0FE" stroke="#1A73E8" stroke-width="1.5"/>
+  <text x="658" y="377" text-anchor="middle" font-size="14" font-weight="bold" fill="#202124">Service layer</text>
+  <text x="658" y="394" text-anchor="middle" font-size="11" fill="#555555">business logic</text>
+
+  <rect x="820" y="198" width="290" height="120" rx="8" fill="#F5F5F5" stroke="#757575" stroke-width="1.5"/>
+  <text x="965" y="236" text-anchor="middle" font-size="15" font-weight="bold" fill="#202124">Data source</text>
+  <text x="965" y="258" text-anchor="middle" font-size="12" fill="#555555">In-memory/JSON product</text>
+  <text x="965" y="274" text-anchor="middle" font-size="12" fill="#555555">data (10 SKUs)</text>
+
+  <rect x="558" y="432" width="200" height="60" rx="8" fill="#FFF3E0" stroke="#F57C00" stroke-width="1.5"/>
+  <text x="658" y="453" text-anchor="middle" font-size="14" font-weight="bold" fill="#202124">In-process cache</text>
+  <text x="658" y="468" text-anchor="middle" font-size="12" fill="#555555">(Caffeine)</text>
+  <text x="658" y="483" text-anchor="middle" font-size="11" fill="#555555">TTL 5-10s</text>
+
+  <line x1="658" y1="254" x2="658" y2="276" stroke="#5F6368" stroke-width="2" marker-end="url(#arrowDemo)"/>
+  <line x1="658" y1="332" x2="658" y2="354" stroke="#5F6368" stroke-width="2" marker-end="url(#arrowDemo)"/>
+  <line x1="658" y1="410" x2="658" y2="432" stroke="#5F6368" stroke-width="2" marker-end="url(#arrowDemo)"/>
+  <rect x="616" y="415" width="86" height="16" fill="#FFFFFF"/>
+  <text x="658" y="427" text-anchor="middle" font-size="11" fill="#555555">cache check</text>
+
+  <polyline points="758,452 800,452 800,258 820,258" fill="none" stroke="#5F6368" stroke-width="2" marker-end="url(#arrowDemo)"/>
+  <rect x="768" y="410" width="94" height="16" fill="#FFFFFF"/>
+  <text x="815" y="422" text-anchor="middle" font-size="11" fill="#555555">cache miss</text>
+
+  <polyline points="222,316 278,316" fill="none" stroke="#5F6368" stroke-width="2" marker-end="url(#arrowDemo)"/>
+  <polyline points="448,316 504,316" fill="none" stroke="#5F6368" stroke-width="2" marker-end="url(#arrowDemo)"/>
+  <rect x="230" y="298" width="42" height="14" fill="#FAFAFA"/>
+  <text x="251" y="309" text-anchor="middle" font-size="11" fill="#555555">request</text>
+
+  <polyline points="658,198 658,166 548,166 548,144" fill="none" stroke="#5F6368" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <polyline points="504,548 147,548 147,360" fill="none" stroke="#5F6368" stroke-width="2" marker-end="url(#arrowDemo)"/>
+  <rect x="182" y="530" width="220" height="16" fill="#FAFAFA"/>
+  <text x="292" y="542" text-anchor="middle" font-size="11" fill="#555555">JSON response (200/400/404/500)</text>
+
+  <rect x="800" y="524" width="340" height="52" rx="8" fill="#FFFFFF" stroke="#5F6368" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="970" y="546" text-anchor="middle" font-size="11.5" fill="#333333">Single instance - no cross-instance cache</text>
+  <text x="970" y="562" text-anchor="middle" font-size="11.5" fill="#333333">consistency concern in this demo</text>
+  <line x1="970" y1="524" x2="970" y2="510" stroke="#5F6368" stroke-width="1.5" stroke-dasharray="3,3"/>
+</svg>
+      </div>
+    </section>
+
+    <section class="chapter" id="layered-design">
+      <p class="chapter-kicker">02 — Architecture</p>
+      <h2 class="chapter-title">Layered design</h2>
+      <div class="grid" style="grid-template-columns: 1fr;">
+        <div class="card" style="display:flex; gap:16px; align-items:flex-start;">
+          <strong style="color: var(--accent); min-width: 110px;">Controller</strong>
+          <p style="margin:0;"><code class="inline">@RestController</code> — thin. No validation logic lives here; it delegates immediately.</p>
+        </div>
+        <div class="card" style="display:flex; gap:16px; align-items:flex-start;">
+          <strong style="color: var(--accent); min-width: 110px;">Service</strong>
+          <p style="margin:0;">Validates productId first (fail fast, before any I/O), then checks cache, then repository.</p>
+        </div>
+        <div class="card" style="display:flex; gap:16px; align-items:flex-start;">
+          <strong style="color: var(--accent); min-width: 110px;">Validator</strong>
+          <p style="margin:0;">Single source of truth for the productId format rule — used nowhere else.</p>
+        </div>
+        <div class="card" style="display:flex; gap:16px; align-items:flex-start;">
+          <strong style="color: var(--accent); min-width: 110px;">Repository</strong>
+          <p style="margin:0;">Interface + in-memory implementation — swappable for a real datastore without touching callers.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="scalability">
+      <p class="chapter-kicker">02 — Architecture</p>
+      <h2 class="chapter-title">Scalability building blocks</h2>
+      <div class="grid grid-3">
+        <div class="card"><h4>Load balancer</h4><p>Cloud Run's built-in HTTPS load balancing across instances (demo: 1 instance; prod: autoscaled).</p></div>
+        <div class="card"><h4>API gateway / edge</h4><p>Cloud Armor in front for WAF + edge rate limiting — defense in depth alongside app-level limiting.</p></div>
+        <div class="card"><h4>Cache</h4><p>In-process (Caffeine, 8s TTL) for the demo. Production needs a shared cache — see appendix.</p></div>
+      </div>
+      <p style="font-size: 13px; color: var(--text-faint); font-style: italic;">Rate limiting for the demo is implemented in application code (token bucket per IP) — shown live, not just described.</p>
+    </section>
+
+    <section class="chapter" id="live-demo">
+      <p class="chapter-kicker">03 — Live demo</p>
+      <h2 class="chapter-title">Live demo</h2>
+      <p class="lede">Deployed on Google Cloud Run — calling the real endpoint, not a mock.</p>
+      <div class="grid grid-2">
+        <div class="card">
+          <h4>Swagger UI</h4>
+          <p>Full interactive API docs, live against the deployed service — try requests directly from the browser.</p>
+          <div class="codebox" style="margin-top:10px; margin-bottom: 0; font-size:11.5px;">https://product-availability-service-829547918263<wbr>.us-west1.run.app/swagger-ui/index.html</div>
+        </div>
+        <div class="card">
+          <h4>Browser console</h4>
+          <p>A purpose-built request console (local HTML page) — real <code class="inline">fetch()</code> calls, response history, and a visual cache-hit demonstration.</p>
+        </div>
+      </div>
+      <div style="display:flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
+        <span class="badge ok">200 — in stock</span>
+        <span class="badge ok">200 — out of stock</span>
+        <span class="badge warn">404 — not found</span>
+        <span class="badge err">400 — malformed</span>
+        <span class="badge err">429 — rate limited</span>
+      </div>
+      <div class="iframe-frame">
+        <iframe src="dashboard.html" title="Live API request console" loading="lazy"></iframe>
+      </div>
+      <p style="font-size: 12px; color: var(--text-faint); margin-top: 8px;">Embedded live — paste the Cloud Run service URL into the field above to connect, if it isn't already filled in.</p>
+    </section>
+
+    <section class="chapter" id="tests">
+      <p class="chapter-kicker">04 — Quality</p>
+      <h2 class="chapter-title">Tests & error handling</h2>
+      <div class="grid grid-2">
+        <div class="card">
+          <h4>47 automated tests</h4>
+          <p><strong>Validation &amp; model (18)</strong> — leading zeros preserved, internal whitespace rejected, max-length boundary, null handling, negative quantity rejected</p>
+          <p><strong>Service &amp; caching (6)</strong> — in-stock, out-of-stock, not-found, invalid ID never touches the repository; three requests for one SKU hit the repository once</p>
+          <p><strong>HTTP integration (10)</strong> — full round-trip for every status code: 200, 400, 404, 405, and a 500 with the data source mocked to fail</p>
+          <p><strong>Filters &amp; logging (13)</strong> — 429 after the burst, limits tracked per client, request-ID propagation, JSON log format, input sanitizing</p>
+        </div>
+        <div class="card">
+          <h4>Centralized error handling</h4>
+          <p>One <code class="inline">@RestControllerAdvice</code> maps exceptions to responses — controllers never build error JSON, and every error shares one body shape.</p>
+          <p><span class="badge err">400</span> Malformed or missing productId</p>
+          <p><span class="badge warn">404</span> No such SKU, or no such route</p>
+          <p><span class="badge warn">405</span> Framework errors keep their real status</p>
+          <p><span class="badge err">429</span> Rate limit (written by the filter, same body)</p>
+          <p><span class="badge err">500</span> Only genuinely unexpected failures, logged at ERROR</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="ops">
+      <p class="chapter-kicker">04 — Quality</p>
+      <h2 class="chapter-title">Logging, caching, rate limiting, docs</h2>
+      <ul class="kicker-list">
+        <li><span class="dot"></span><div><strong>Request tracing</strong> — every request gets an <code class="inline">X-Request-Id</code> (the caller's own, if safe, otherwise generated), attached to every log line for that request and returned as a response header. One summary line per request: method, path, status, latency.</div></li>
+        <li><span class="dot"></span><div><strong>Cloud-native logs</strong> — in the container, logs are one JSON object per line with <code class="inline">severity</code>, <code class="inline">message</code>, <code class="inline">time</code> and <code class="inline">requestId</code>, which Cloud Logging parses natively; locally they stay readable plain text.</div></li>
+        <li><span class="dot"></span><div><strong>Caching</strong> — Caffeine, 8s TTL, in-process, keyed on the <em>validated</em> ID so <code class="inline">" 10001"</code> and <code class="inline">"10001"</code> share one entry. Confirmed live: repeat requests drop from ~70ms to ~40ms.</div></li>
+        <li><span class="dot"></span><div><strong>Rate limiting</strong> — token bucket per client IP (20 req/sec), servlet filter ahead of the controller. Demo-grade by design: the IP comes from a header the caller can set, so production limits belong at the gateway, keyed by API key.</div></li>
+        <li><span class="dot"></span><div><strong>OpenAPI / Swagger</strong> — auto-generated from the annotated controller, live on the deployed service.</div></li>
+        <li><span class="dot"></span><div><strong>Container</strong> — multi-stage build, JRE-only runtime image, runs as an unprivileged user.</div></li>
+      </ul>
+      <div class="codebox" style="font-size: 11.5px; white-space: pre-wrap;">{"time":"2026-09-30T23:32:00.969Z","severity":"WARNING","message":"Invalid productId rejected: productId must be 1-20 numeric digits with no spaces; got: 'abc'","requestId":"demo-123"}
+{"time":"2026-09-30T23:32:00.973Z","severity":"INFO","message":"GET /availability/abc -> 400 in 10ms","requestId":"demo-123"}</div>
+      <p style="font-size: 12px; color: var(--text-faint);">Two real log lines from one request, trimmed to the key fields. The caller's own request ID ties them together.</p>
+    </section>
+
+    <section class="chapter" id="cors">
+      <p class="chapter-kicker">04 — Quality</p>
+      <h2 class="chapter-title">CORS: why the endpoint allows any origin</h2>
+      <p class="lede">The service allows cross-origin <code class="inline">GET</code> requests to <code class="inline">/availability/**</code> from any origin. Here's why, and what changes in production.</p>
+      <div class="grid grid-3">
+        <div class="card">
+          <h4>Why it's needed</h4>
+          <p>Browsers won't let a page read a response from a different origin unless the server opts in. The live demo console runs on a different origin than Cloud Run, so without this its calls would reach the service but the browser would withhold the response. curl, Postman and service-to-service calls don't enforce CORS at all.</p>
+        </div>
+        <div class="card">
+          <h4>Why allow-all is fine here</h4>
+          <p>The endpoint is read-only, unauthenticated, uses no cookies or credentials, and returns non-sensitive demo data. CORS isn't access control; it only decides which web pages may read responses in a browser, and anyone can already call the endpoint directly. Scope is narrow: only this path, only <code class="inline">GET</code>.</p>
+        </div>
+        <div class="card">
+          <h4>Production</h4>
+          <p>Real callers (checkout, storefront) are internal services, so the service would sit behind Cloud Run IAM or service-to-service auth via a gateway, not be publicly reachable. If a browser client needed direct access, allowed origins would be the specific storefront domains, not <code class="inline">*</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="prod-architecture">
+      <p class="chapter-kicker">05 — Path to production</p>
+      <h2 class="chapter-title">Target architecture: multi-instance, shared cache</h2>
+      <div class="diagram-frame">
+<svg viewBox="0 0 1280 820" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <defs>
+    <marker id="arrowProd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5F6368"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1280" height="820" fill="#FFFFFF"/>
+
+  <text x="640" y="34" text-anchor="middle" font-size="22" font-weight="bold" fill="#202124">Production target architecture (multi-instance, shared cache)</text>
+
+  <rect x="40" y="56" width="1200" height="720" rx="24" fill="#FAFAFA" stroke="#DADCE0" stroke-width="2"/>
+  <text x="62" y="82" font-size="13" font-weight="bold" fill="#5F6368">GCP Project</text>
+
+  <rect x="64" y="300" width="130" height="90" rx="8" fill="#F5F5F5" stroke="#757575" stroke-width="1.5"/>
+  <text x="129" y="332" text-anchor="middle" font-size="14" font-weight="bold" fill="#202124">Client /</text>
+  <text x="129" y="348" text-anchor="middle" font-size="14" font-weight="bold" fill="#202124">internal</text>
+  <text x="129" y="364" text-anchor="middle" font-size="14" font-weight="bold" fill="#202124">services</text>
+
+  <rect x="224" y="288" width="170" height="114" rx="8" fill="#E8F0FE" stroke="#1A73E8" stroke-width="1.5"/>
+  <text x="309" y="316" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#202124">Cloud Armor +</text>
+  <text x="309" y="332" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#202124">External HTTPS</text>
+  <text x="309" y="348" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#202124">Load Balancer</text>
+  <text x="309" y="368" text-anchor="middle" font-size="11" fill="#555555">WAF, edge rate</text>
+  <text x="309" y="382" text-anchor="middle" font-size="11" fill="#555555">limiting, TLS</text>
+
+  <rect x="424" y="298" width="150" height="94" rx="8" fill="#E8F0FE" stroke="#1A73E8" stroke-width="1.5"/>
+  <text x="499" y="326" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#202124">API Gateway</text>
+  <text x="499" y="346" text-anchor="middle" font-size="11" fill="#555555">auth, quota,</text>
+  <text x="499" y="360" text-anchor="middle" font-size="11" fill="#555555">request validation</text>
+
+  <rect x="604" y="96" width="600" height="330" rx="20" fill="#E1F5FE" stroke="#4285F4" stroke-width="2"/>
+  <text x="624" y="122" font-size="14" font-weight="bold" fill="#1A73E8">Cloud Run</text>
+  <text x="1010" y="122" text-anchor="end" font-size="12" fill="#1A73E8">min=3, max=N (autoscaled)</text>
+
+  <rect x="624" y="138" width="176" height="256" rx="8" fill="#FFFFFF" stroke="#4285F4" stroke-width="1.5"/>
+  <text x="712" y="160" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#202124">Service instance (Java)</text>
+  <rect x="640" y="172" width="144" height="40" rx="6" fill="#E8F0FE" stroke="#1A73E8" stroke-width="1.2"/>
+  <text x="712" y="196" text-anchor="middle" font-size="11.5" fill="#202124">Rate limiter</text>
+  <rect x="640" y="222" width="144" height="40" rx="6" fill="#E8F0FE" stroke="#1A73E8" stroke-width="1.2"/>
+  <text x="712" y="246" text-anchor="middle" font-size="11.5" fill="#202124">Controller</text>
+  <rect x="640" y="272" width="144" height="40" rx="6" fill="#E8F0FE" stroke="#1A73E8" stroke-width="1.2"/>
+  <text x="712" y="296" text-anchor="middle" font-size="11.5" fill="#202124">Service layer</text>
+  <line x1="712" y1="212" x2="712" y2="222" stroke="#5F6368" stroke-width="1.5" marker-end="url(#arrowProd)"/>
+  <line x1="712" y1="262" x2="712" y2="272" stroke="#5F6368" stroke-width="1.5" marker-end="url(#arrowProd)"/>
+
+  <rect x="816" y="138" width="176" height="256" rx="8" fill="#FFFFFF" stroke="#4285F4" stroke-width="1.5"/>
+  <text x="904" y="160" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#202124">Service instance (Java)</text>
+  <rect x="832" y="172" width="144" height="40" rx="6" fill="#E8F0FE" stroke="#1A73E8" stroke-width="1.2"/>
+  <text x="904" y="196" text-anchor="middle" font-size="11.5" fill="#202124">Rate limiter</text>
+  <rect x="832" y="222" width="144" height="40" rx="6" fill="#E8F0FE" stroke="#1A73E8" stroke-width="1.2"/>
+  <text x="904" y="246" text-anchor="middle" font-size="11.5" fill="#202124">Controller</text>
+  <rect x="832" y="272" width="144" height="40" rx="6" fill="#E8F0FE" stroke="#1A73E8" stroke-width="1.2"/>
+  <text x="904" y="296" text-anchor="middle" font-size="11.5" fill="#202124">Service layer</text>
+  <line x1="904" y1="212" x2="904" y2="222" stroke="#5F6368" stroke-width="1.5" marker-end="url(#arrowProd)"/>
+  <line x1="904" y1="262" x2="904" y2="272" stroke="#5F6368" stroke-width="1.5" marker-end="url(#arrowProd)"/>
+
+  <rect x="1008" y="138" width="176" height="256" rx="8" fill="#FFFFFF" stroke="#4285F4" stroke-width="1.5"/>
+  <text x="1096" y="160" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#202124">Service instance (Java)</text>
+  <rect x="1024" y="172" width="144" height="40" rx="6" fill="#E8F0FE" stroke="#1A73E8" stroke-width="1.2"/>
+  <text x="1096" y="196" text-anchor="middle" font-size="11.5" fill="#202124">Rate limiter</text>
+  <rect x="1024" y="222" width="144" height="40" rx="6" fill="#E8F0FE" stroke="#1A73E8" stroke-width="1.2"/>
+  <text x="1096" y="246" text-anchor="middle" font-size="11.5" fill="#202124">Controller</text>
+  <rect x="1024" y="272" width="144" height="40" rx="6" fill="#E8F0FE" stroke="#1A73E8" stroke-width="1.2"/>
+  <text x="1096" y="296" text-anchor="middle" font-size="11.5" fill="#202124">Service layer</text>
+  <line x1="1096" y1="212" x2="1096" y2="222" stroke="#5F6368" stroke-width="1.5" marker-end="url(#arrowProd)"/>
+  <line x1="1096" y1="262" x2="1096" y2="272" stroke="#5F6368" stroke-width="1.5" marker-end="url(#arrowProd)"/>
+
+  <polyline points="195,345 224,345" fill="none" stroke="#5F6368" stroke-width="2" marker-end="url(#arrowProd)"/>
+  <polyline points="394,345 424,345" fill="none" stroke="#5F6368" stroke-width="2" marker-end="url(#arrowProd)"/>
+  <polyline points="575,345 604,345" fill="none" stroke="#5F6368" stroke-width="2" marker-end="url(#arrowProd)"/>
+  <polyline points="604,364 500,364 500,412 604,412" fill="none" stroke="#5F6368" stroke-width="2" marker-end="url(#arrowProd)"/>
+  <rect x="440" y="391" width="90" height="16" fill="#FAFAFA"/>
+  <text x="485" y="402" text-anchor="middle" font-size="11" fill="#555555">load-balanced</text>
+
+  <rect x="624" y="472" width="140" height="56" rx="8" fill="#F5F5F5" stroke="#757575" stroke-width="1.5"/>
+  <text x="694" y="496" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#202124">Serverless VPC</text>
+  <text x="694" y="512" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#202124">Connector</text>
+
+  <rect x="824" y="460" width="220" height="80" rx="8" fill="#FFF3E0" stroke="#F57C00" stroke-width="1.5"/>
+  <text x="934" y="486" text-anchor="middle" font-size="14" font-weight="bold" fill="#202124">Memorystore (Redis)</text>
+  <text x="934" y="504" text-anchor="middle" font-size="11" fill="#555555">shared cache, TTL-based,</text>
+  <text x="934" y="518" text-anchor="middle" font-size="11" fill="#555555">consistent across instances</text>
+
+  <polyline points="712,394 712,440 694,440 694,472" fill="none" stroke="#5F6368" stroke-width="2" marker-end="url(#arrowProd)"/>
+  <polyline points="904,394 904,440 694,440 694,472" fill="none" stroke="#5F6368" stroke-width="2"/>
+  <polyline points="1096,394 1096,440 694,440 694,472" fill="none" stroke="#5F6368" stroke-width="2"/>
+  <rect x="760" y="432" width="76" height="16" fill="#E1F5FE"/>
+  <text x="798" y="444" text-anchor="middle" font-size="11" fill="#555555">get/set</text>
+
+  <polyline points="764,500 824,500" fill="none" stroke="#5F6368" stroke-width="2" marker-end="url(#arrowProd)"/>
+
+  <rect x="944" y="600" width="260" height="88" rx="8" fill="#F5F5F5" stroke="#757575" stroke-width="1.5"/>
+  <text x="1074" y="628" text-anchor="middle" font-size="14" font-weight="bold" fill="#202124">Product/Inventory data</text>
+  <text x="1074" y="646" text-anchor="middle" font-size="14" font-weight="bold" fill="#202124">source</text>
+  <text x="1074" y="664" text-anchor="middle" font-size="11" fill="#555555">Real inventory system (e.g.</text>
+  <text x="1074" y="678" text-anchor="middle" font-size="11" fill="#555555">OMS / SFCC inventory service)</text>
+
+  <polyline points="1096,394 1096,430 1074,430 1074,600" fill="none" stroke="#5F6368" stroke-width="2" marker-end="url(#arrowProd)"/>
+  <rect x="1082" y="470" width="86" height="16" fill="#FAFAFA"/>
+  <text x="1125" y="482" text-anchor="middle" font-size="11" fill="#555555">cache miss</text>
+
+  <rect x="944" y="702" width="260" height="34" rx="6" fill="#FFFFFF" stroke="#757575" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="1074" y="723" text-anchor="middle" font-size="11" fill="#333333">future: event-driven updates on stock change</text>
+
+  <polyline points="604,412 260,412 260,436 195,436 195,390" fill="none" stroke="#5F6368" stroke-width="2" marker-end="url(#arrowProd)"/>
+  <rect x="250" y="420" width="110" height="16" fill="#FAFAFA"/>
+  <text x="305" y="432" text-anchor="middle" font-size="11" fill="#555555">JSON response</text>
+
+  <rect x="796" y="738" width="440" height="30" rx="8" fill="#FFFFFF" stroke="#5F6368" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="1016" y="757" text-anchor="middle" font-size="11.5" fill="#333333">Any instance can serve any request - shared cache keeps responses consistent</text>
+</svg>
+      </div>
+    </section>
+
+    <section class="chapter" id="one-instance">
+      <p class="chapter-kicker">05 — Path to production</p>
+      <h2 class="chapter-title">Why one instance isn't enough</h2>
+      <p class="lede">With multiple Cloud Run instances, each holds its own independent in-process cache. Two customers hitting the same SKU at the same moment can get different answers.</p>
+      <div class="grid grid-2">
+        <div class="card">
+          <h4>Today (demo)</h4>
+          <ul>
+            <li>In-process cache (Caffeine)</li>
+            <li>1 instance — no consistency question</li>
+            <li>Zero extra infra, zero network hop</li>
+          </ul>
+        </div>
+        <div class="card" style="background: var(--amber-bg); border-color: var(--amber);">
+          <h4 style="color: var(--amber);">Production</h4>
+          <ul>
+            <li>Memorystore (managed Redis) shared across all instances</li>
+            <li>Reached over a Serverless VPC Connector</li>
+            <li>Every instance sees the same cached value</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="next">
+      <p class="chapter-kicker">06 — Wrap-up</p>
+      <h2 class="chapter-title">What I'd do next</h2>
+      <ul class="kicker-list">
+        <li><span class="dot"></span><div>Wire up a shared cache (Memorystore) the moment a second instance exists</div></li>
+        <li><span class="dot"></span><div>Replace the in-memory data source with real inventory (OMS / SFCC), event-driven</div></li>
+        <li><span class="dot"></span><div>Add SLOs and alerting on top of the structured logs, before this sees real traffic</div></li>
+        <li><span class="dot"></span><div>Move rate limiting to the gateway, keyed by API key instead of a caller-supplied IP header, and tune thresholds against real flash-sale traffic</div></li>
+        <li><span class="dot"></span><div>Put checkout on a cache-bypassing read, with stock reserved at the OMS; the 8-second cache stays for storefront and product pages</div></li>
+        <li><span class="dot"></span><div>Lock down access: Cloud Run IAM or service-to-service auth, and CORS limited to real storefront origins</div></li>
+      </ul>
+      <p style="font-family: var(--font-head); font-style: italic; font-size: 17px; color: var(--text-dim);">Thank you — happy to go deeper on any part of this in Q&A. The sections below are reference material for that.</p>
+    </section>
+
+    <section class="chapter" id="appendix-alternatives">
+      <p class="chapter-kicker">Appendix</p>
+      <h2 class="chapter-title">Alternatives considered</h2>
+      <div class="grid grid-2">
+        <div class="card">
+          <h4>Compute: Cloud Run <span style="color:var(--green);">(chosen)</span> vs. GKE</h4>
+          <p>Cloud Run: fully managed, scales to zero, minimal setup — right fit for one small stateless service.</p>
+          <p>GKE: full cluster control, justified once running many services with shared infra needs; no scale-to-zero, meaningfully more to operate.</p>
+        </div>
+        <div class="card">
+          <h4>Cache: Memorystore <span style="color:var(--green);">(prod)</span> vs. in-process <span style="color:var(--green);">(demo)</span></h4>
+          <p>Memorystore: managed Redis, sub-ms latency, needs a VPC connector. Solves the multi-instance consistency problem.</p>
+          <p>In-process: zero infra, but each instance holds an independent, inconsistent copy once scaled out.</p>
+        </div>
+      </div>
+      <div class="card">
+        <h4>Edge / API gateway</h4>
+        <p><strong>Cloud Run + Cloud Armor</strong> (chosen) — managed HTTPS + WAF/edge rate limiting, minimal setup.
+        <strong>Google API Gateway</strong> — lighter managed layer, API-key auth, request validation.
+        <strong>Apigee</strong> — full API management (developer portal, quotas, analytics) — justified with many external consumers, heavier than this scope needs.</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="appendix-race">
+      <p class="chapter-kicker">Appendix</p>
+      <h2 class="chapter-title">Race conditions</h2>
+      <p class="lede">This exercise is read-only, so there's no write path to race on. In production: two shoppers add the last unit to cart at the same instant.</p>
+      <div class="card" style="margin-bottom: 20px;">
+        <div class="timeline-lane">
+          <span class="lane-label">Customer A</span>
+          <div class="timeline-step">Read qty = 1</div>
+          <div class="timeline-step">Check qty &gt; 0 ✓</div>
+          <div class="timeline-step">Add to cart</div>
+          <div class="timeline-step">Decrement qty</div>
+        </div>
+        <div class="timeline-lane">
+          <span class="lane-label">Customer B</span>
+          <div class="timeline-step">Read qty = 1</div>
+          <div class="timeline-step">Check qty &gt; 0 ✓</div>
+          <div class="timeline-step">Add to cart</div>
+          <div class="timeline-step conflict">Decrement qty</div>
+        </div>
+        <p style="font-size: 12.5px; color: var(--red); font-style: italic; margin: 10px 0 0;">Both read qty=1, both pass the check, both decrement — final qty = -1. Oversold.</p>
+      </div>
+      <div class="grid grid-3">
+        <div class="card">
+          <h4>Optimistic locking</h4>
+          <div class="codebox" style="font-size: 10.5px;">UPDATE stock SET qty=qty-1,
+  version=version+1
+WHERE id=? AND version=?
+  AND qty &gt; 0</div>
+          <p>Retry on conflict. Simple, no extra infra — good for low-contention SKUs.</p>
+        </div>
+        <div class="card">
+          <h4>Reservation + TTL</h4>
+          <p>Reserve 1 unit for 10 minutes at add-to-cart; release automatically if checkout doesn't complete. Standard e-commerce pattern.</p>
+        </div>
+        <div class="card">
+          <h4>Atomic decrement</h4>
+          <p>Push check-and-decrement into one atomic op (e.g. Redis <code class="inline">DECR</code> with a floor check). Removes the race by construction — best for flash-sale SKUs.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="appendix-region">
+      <p class="chapter-kicker">Appendix</p>
+      <h2 class="chapter-title">Multi-region</h2>
+      <p class="lede">Cloud Run deploys to one region at a time — multi-region is composed, not a single setting.</p>
+      <div class="card" style="margin-bottom: 20px;">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:center; padding: 8px 0;">
+          <div style="background: var(--accent); color:#fff; border-radius:8px; padding:12px 16px; font-size:12.5px; font-weight:600; text-align:center;">Global HTTPS<br>load balancer</div>
+          <span style="color:var(--text-faint);">⇉</span>
+          <div style="background: var(--accent-dim); color:var(--accent); border-radius:8px; padding:12px 16px; font-size:12px; font-weight:600; text-align:center;">us-west1<br><span style="font-weight:400; opacity:0.8;">Cloud Run + Memorystore</span></div>
+          <div style="background: var(--accent-dim); color:var(--accent); border-radius:8px; padding:12px 16px; font-size:12px; font-weight:600; text-align:center;">europe-west1<br><span style="font-weight:400; opacity:0.8;">Cloud Run + Memorystore</span></div>
+          <div style="background: var(--accent-dim); color:var(--accent); border-radius:8px; padding:12px 16px; font-size:12px; font-weight:600; text-align:center;">asia-northeast1<br><span style="font-weight:400; opacity:0.8;">Cloud Run + Memorystore</span></div>
+        </div>
+        <p style="font-size:12px; color:var(--text-faint); font-style:italic; text-align:center; margin: 4px 0 0;">Serverless NEG per region — latency-based routing via Google's anycast network.</p>
+      </div>
+      <div class="callout">
+        <strong>The catch: Memorystore is regional too.</strong> Each region needs its own cache. The thing that actually has to be globally consistent is the inventory source of truth — typically a globally-replicated database (e.g. Cloud Spanner) or accepted eventual consistency between regions.
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc-list a'));
+  var sections = links.map(function (a) { return document.getElementById(a.getAttribute('href').slice(1)); });
+
+  function onScroll() {
+    var y = window.scrollY + 120;
+    var activeIdx = 0;
+    for (var i = 0; i < sections.length; i++) {
+      if (sections[i] && sections[i].offsetTop <= y) activeIdx = i;
+    }
+    links.forEach(function (a, i) { a.classList.toggle('active', i === activeIdx); });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+</script>
+</body>
+</html>

@@ -22,7 +22,8 @@ public class ProductAvailabilityService {
         this.productIdValidator = productIdValidator;
     }
 
-    @Cacheable(cacheNames = "productAvailability", key = "#rawProductId")
+    // Key on the validated ID so " 10001" and "10001" share one entry; invalid IDs throw before caching.
+    @Cacheable(cacheNames = "productAvailability", key = "@productIdValidator.validate(#rawProductId)")
     public AvailabilityResponse getAvailability(String rawProductId) {
         String productId = productIdValidator.validate(rawProductId);
 

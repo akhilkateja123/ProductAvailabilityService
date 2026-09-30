@@ -3,6 +3,7 @@ package com.aritzia.availability.controller;
 import com.aritzia.availability.dto.AvailabilityResponse;
 import com.aritzia.availability.dto.ErrorResponse;
 import com.aritzia.availability.service.ProductAvailabilityService;
+import com.aritzia.availability.util.SafeText;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -41,7 +42,7 @@ public class ProductAvailabilityController {
     })
     @GetMapping("/availability/{productId}")
     public ResponseEntity<AvailabilityResponse> getAvailability(@PathVariable String productId) {
-        log.info("Received availability request for productId={}", productId);
+        log.info("Received availability request for productId={}", SafeText.of(productId));
         AvailabilityResponse response = productAvailabilityService.getAvailability(productId);
         return ResponseEntity.ok(response);
     }

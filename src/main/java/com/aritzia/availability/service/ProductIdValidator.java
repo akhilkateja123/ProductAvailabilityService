@@ -1,6 +1,7 @@
 package com.aritzia.availability.service;
 
 import com.aritzia.availability.exception.InvalidProductIdException;
+import com.aritzia.availability.util.SafeText;
 import org.springframework.stereotype.Component;
 
 import java.util.regex.Pattern;
@@ -17,7 +18,7 @@ public class ProductIdValidator {
         String trimmed = rawProductId.trim();
         if (!VALID_PRODUCT_ID.matcher(trimmed).matches()) {
             throw new InvalidProductIdException(
-                    "productId must be 1-20 numeric digits with no spaces; got: '" + rawProductId + "'");
+                    "productId must be 1-20 numeric digits with no spaces; got: '" + SafeText.of(rawProductId) + "'");
         }
         return trimmed;
     }

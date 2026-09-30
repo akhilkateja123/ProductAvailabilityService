@@ -1,9 +1,10 @@
 package com.aritzia.availability.exception;
 
 import com.aritzia.availability.dto.ErrorResponse;
+import com.aritzia.availability.util.SafeText;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -15,16 +16,20 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    /**
-     * GET /availability/ (empty productId segment) never reaches the controller -
-     * Spring MVC treats it as an unmatched static-resource request instead of an
-     * empty path variable. Map it to the same 400 an empty/blank productId gets.
-     */
+    // An empty productId (GET /availability/) never reaches the controller; Spring treats it as an
+    // unmatched route. Only that path gets the 400 — every other unmatched route is a genuine 404.
     @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ErrorResponse> handleEmptyProductId(NoResourceFoundException ex) {
-        log.warn("Rejecting request with missing productId path segment");
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ErrorResponse.of(400, "Bad Request", "productId must not be null or empty"));
+    public ResponseEntity<ErrorResponse> handleNoResource(NoResourceFoundException ex, HttpServletRequest request) {
+        String path = request.getRequestURI();
+        if (path.equals("/availability") || path.equals("/availability/")) {
+            log.warn("Rejecting request with missing productId path segment");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ErrorResponse.of(400, "Bad Request", "productId must not be null or empty"));
+        }
+        String safePath = SafeText.of(path);
+        log.info("No route for {}", safePath);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ErrorResponse.of(404, "Not Found", "No route for " + safePath));
     }
 
     @ExceptionHandler(InvalidProductIdException.class)
@@ -41,16 +46,17 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(404, "Not Found", ex.getMessage()));
     }
 
-    @ExceptionHandler(RateLimitExceededException.class)
-    public ResponseEntity<ErrorResponse> handleRateLimitExceeded(RateLimitExceededException ex) {
-        log.warn("Rate limit exceeded: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                .header(HttpHeaders.RETRY_AFTER, "1")
-                .body(ErrorResponse.of(429, "Too Many Requests", ex.getMessage()));
-    }
-
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex) {
+        // Spring MVC's own exceptions (405, 415, ...) carry their correct status; keep it instead of masking as 500.
+        if (ex instanceof org.springframework.web.ErrorResponse springError) {
+            int status = springError.getStatusCode().value();
+            log.warn("Request rejected by framework ({}): {}", status, ex.getMessage());
+            return ResponseEntity.status(status)
+                    .headers(springError.getHeaders())
+                    .body(ErrorResponse.of(status, HttpStatus.valueOf(status).getReasonPhrase(),
+                            springError.getBody().getDetail()));
+        }
         log.error("Unexpected server error", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ErrorResponse.of(500, "Internal Server Error", "An unexpected error occurred"));

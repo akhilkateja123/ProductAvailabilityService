@@ -1,5 +1,7 @@
 package com.aritzia.availability.config;
 
+import com.aritzia.availability.dto.ErrorResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
@@ -32,6 +34,11 @@ public class RateLimitFilter extends HttpFilter {
     private static final Duration REFILL_PERIOD = Duration.ofSeconds(1);
 
     private final Map<String, Bucket> bucketsByClientIp = new ConcurrentHashMap<>();
+    private final ObjectMapper objectMapper;
+
+    public RateLimitFilter(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     @Override
     protected void doFilter(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -48,8 +55,8 @@ public class RateLimitFilter extends HttpFilter {
         response.setStatus(429);
         response.setHeader("Retry-After", "1");
         response.setContentType("application/json");
-        response.getWriter().write(
-                "{\"status\":429,\"error\":\"Too Many Requests\",\"message\":\"Rate limit exceeded, retry shortly\"}");
+        objectMapper.writeValue(response.getWriter(),
+                ErrorResponse.of(429, "Too Many Requests", "Rate limit exceeded, retry shortly"));
     }
 
     private Bucket newBucket() {
